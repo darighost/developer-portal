@@ -114,7 +114,7 @@ export class Core extends MultiEnvRootStack {
 
       new cdk.aws_route53.CnameRecord(this, 'legacy-hasura', {
         zone: this.hostedZone,
-        recordName: 'legacy.api.developer.worldcoin.org',
+        recordName: 'api.legacy.developer.worldcoin.org',
         domainName: 'api.developer.worldcoin.org',
       })
     }
