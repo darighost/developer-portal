@@ -37,6 +37,12 @@ export class Web extends MultiEnvRootStack {
       ? (JSON.parse(stackParameters.envs.SCALING_CONFIG) as ScalingConfig)
       : null
 
+    const logsBucket = new cdk.aws_s3.Bucket(this, 'LogsBucket', {
+      encryption: cdk.aws_s3.BucketEncryption.KMS_MANAGED,
+      blockPublicAccess: cdk.aws_s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+    })
+
     if (!scalingConfig) {
       console.error('Scaling config is not defined')
     }
@@ -154,9 +160,8 @@ export class Web extends MultiEnvRootStack {
                 Host: 'http-intake.logs.datadoghq.com',
                 dd_service: id,
                 dd_source: 'nodejs',
-                dd_tags: `app:${this.node.tryGetContext('app')}, env:${
-                  this.node.tryGetContext('env').id
-                }`,
+                dd_tags: `app:${this.node.tryGetContext('app')}, env:${this.node.tryGetContext('env').id
+                  }`,
                 TLS: 'on',
                 provider: 'ecs',
               },
@@ -193,6 +198,178 @@ export class Web extends MultiEnvRootStack {
       timeout: cdk.Duration.seconds(scalingConfig?.healthCheck.timeout ?? 2),
     })
 
+    // TODO Remove this after the migration
+    // FIXME To complete the migration change the domain name of the fargate and certificate constructs
+    // above to legacy.developer.worldcoin.org
+    // #region Temporary deploy to api.legacy.developer.worldcoin.org
+    const certificateTmp = new cdk.aws_certificatemanager.Certificate(
+      this,
+      'CertificateTmp',
+      {
+        domainName: 'legacy.developer.worldcoin.org',
+        validation: cdk.aws_certificatemanager.CertificateValidation.fromDns(
+          props.hostedZone
+        ),
+      }
+    )
+
+    const fargateServiceTmp =
+      new cdk.aws_ecs_patterns.ApplicationLoadBalancedFargateService(
+        this,
+        'FargateServiceTmp',
+        {
+          domainName: 'legacy.developer.worldcoin.org',
+          domainZone: props.hostedZone,
+          certificate: certificateTmp,
+          circuitBreaker: { rollback: true },
+          cluster: ecsCluster,
+          memoryLimitMiB: scalingConfig?.taskDefinition.memoryLimitMiB || 1024,
+          desiredCount: 3,
+          cpu: scalingConfig?.taskDefinition.cpu || 512,
+          redirectHTTP: true,
+
+          taskImageOptions: {
+            containerPort: Web.port,
+            environment: {
+              ...stackParameters.envs,
+              NEXT_PUBLIC_GRAPHQL_API_URL: props.graphQlApiUrl,
+            },
+            secrets: {
+              ALCHEMY_API_KEY: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'ALCHEMY_API_KEY'
+              ),
+              HASURA_GRAPHQL_JWT_SECRET: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'HASURA_GRAPHQL_JWT_SECRET'
+              ),
+              INTERNAL_ENDPOINTS_SECRET: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.internalEndpointSecret
+              ),
+              CONSUMER_BACKEND_JWT: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'CONSUMER_BACKEND_JWT'
+              ),
+              CONSUMER_BACKEND_JWT_STAGING:
+                cdk.aws_ecs.Secret.fromSecretsManager(
+                  props.secretsSecret,
+                  'CONSUMER_BACKEND_JWT_STAGING'
+                ),
+              TWILIO_VERIFY_SERVICE: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'TWILIO_VERIFY_SERVICE'
+              ),
+              TWILIO_ACCOUNT_SID: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'TWILIO_ACCOUNT_SID'
+              ),
+              TWILIO_AUTH_TOKEN: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'TWILIO_AUTH_TOKEN'
+              ),
+              PHONE_NULLIFIER_KEY: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'PHONE_NULLIFIER_KEY'
+              ),
+              PHONE_NULLIFIER_SIGNING_KEY:
+                cdk.aws_ecs.Secret.fromSecretsManager(
+                  props.secretsSecret,
+                  'PHONE_NULLIFIER_SIGNING_KEY'
+                ),
+              VERIFF_PUBLIC_KEY: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'VERIFF_PUBLIC_KEY'
+              ),
+              VERIFF_PRIVATE_KEY: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'VERIFF_PRIVATE_KEY'
+              ),
+              STAGING_SIGNUP_SEQUENCER_KEY:
+                cdk.aws_ecs.Secret.fromSecretsManager(
+                  props.secretsSecret,
+                  'STAGING_SIGNUP_SEQUENCER_KEY'
+                ),
+              GENERAL_SECRET_KEY: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'GENERAL_SECRET_KEY'
+              ),
+              ANALYTICS_API_KEY: cdk.aws_ecs.Secret.fromSecretsManager(
+                props.secretsSecret,
+                'ANALYTICS_API_KEY'
+              ),
+            },
+            logDriver: cdk.aws_ecs.LogDrivers.firelens({
+              options: {
+                Name: 'datadog',
+                Host: 'http-intake.logs.datadoghq.com',
+                dd_service: id,
+                dd_source: 'nodejs',
+                dd_tags: `app:${this.node.tryGetContext('app')}, env:${this.node.tryGetContext('env').id
+                  }`,
+                TLS: 'on',
+                provider: 'ecs',
+              },
+
+              secretOptions: {
+                apikey: cdk.aws_ecs.Secret.fromSecretsManager(
+                  props.dataDogApiKeySecret
+                ),
+              },
+            }),
+
+            image: cdk.aws_ecs.ContainerImage.fromAsset(
+              path.dirname(require.resolve('../../../web/Dockerfile'))
+            ),
+          },
+        }
+      )
+
+    fargateServiceTmp.targetGroup.setAttribute('deregistration_delay.timeout_seconds', '10')
+    fargateServiceTmp.service.connections.allowFromAnyIpv4(cdk.aws_ec2.Port.tcp(Web.port))
+
+    // ANCHOR Health check
+    fargateServiceTmp.targetGroup.configureHealthCheck({
+      enabled: true,
+      healthyThresholdCount:
+        scalingConfig?.healthCheck.healthyThresholdCount ?? 2,
+      interval: cdk.Duration.seconds(scalingConfig?.healthCheck.interval ?? 5),
+      path: scalingConfig?.healthCheck.path ?? '/api/health',
+      timeout: cdk.Duration.seconds(scalingConfig?.healthCheck.timeout ?? 2),
+    })
+
+    fargateServiceTmp.loadBalancer.logAccessLogs(logsBucket)
+
+
+    NagSuppressions.addResourceSuppressions(
+      fargateServiceTmp.loadBalancer,
+      [{ id: 'AwsSolutions-EC23', reason: 'Public ELB' }],
+      true
+    )
+
+    NagSuppressions.addResourceSuppressions(
+      fargateServiceTmp.service,
+      [{ id: 'AwsSolutions-EC23', reason: 'Public service' }],
+      true
+    )
+
+    NagSuppressions.addResourceSuppressions(
+      fargateServiceTmp.taskDefinition,
+      [
+        {
+          id: 'AwsSolutions-ECS2',
+          reason: 'Avoiding env variables is to much hassle.',
+        },
+        {
+          appliesTo: ['Resource::*'],
+          id: 'AwsSolutions-IAM5',
+          reason:
+            'ecr:GrantAuthorizationToken can not be applied to a certain resource and thus is applied to [Resource::*].',
+        },
+      ],
+      true
+    )
+    // #endregion
+
     // ANCHOR Autoscaling
     this.scalableTarget = this.fargateService.service.autoScaleTaskCount({
       minCapacity:
@@ -217,12 +394,6 @@ export class Web extends MultiEnvRootStack {
     new DataDog(this, 'DataDog', {
       dataDogApiKeySecret: props.dataDogApiKeySecret,
       taskDefinition: this.fargateService.taskDefinition,
-    })
-
-    const logsBucket = new cdk.aws_s3.Bucket(this, 'LogsBucket', {
-      encryption: cdk.aws_s3.BucketEncryption.KMS_MANAGED,
-      blockPublicAccess: cdk.aws_s3.BlockPublicAccess.BLOCK_ALL,
-      enforceSSL: true,
     })
 
     this.fargateService.loadBalancer.logAccessLogs(logsBucket)
