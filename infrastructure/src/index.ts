@@ -34,30 +34,30 @@ export class App extends cdk.App {
     const core = new Core(this, 'core', { env: stageContext.env, terminationProtection: true })
     const data = new Data(this, 'data', { env: stageContext.env, vpc: core.vpc, terminationProtection: true })
 
-    const hasura = new Hasura(this, 'hasura', {
-      cloudMapNamespace: core.cloudMapNamespace,
-      dataDogApiKeySecret: core.dataDogApiKeySecret,
-      env: stageContext.env,
-      hostedZone: core.hostedZone,
-      databaseCluster: data.databaseCluster,
-      databaseClusterSecret: data.databaseCluster.secret!,
-      internalEndpointSecret: core.internalEndpointSecret,
-      secretsSecret: core.secretsSecret,
-      vpc: core.vpc,
-      webUrl: `http://${webStackId}.${core.cloudMapNamespace.namespaceName}:${Web.port}`,
-    })
+    // const hasura = new Hasura(this, 'hasura', {
+    //   cloudMapNamespace: core.cloudMapNamespace,
+    //   dataDogApiKeySecret: core.dataDogApiKeySecret,
+    //   env: stageContext.env,
+    //   hostedZone: core.hostedZone,
+    //   databaseCluster: data.databaseCluster,
+    //   databaseClusterSecret: data.databaseCluster.secret!,
+    //   internalEndpointSecret: core.internalEndpointSecret,
+    //   secretsSecret: core.secretsSecret,
+    //   vpc: core.vpc,
+    //   webUrl: `http://${webStackId}.${core.cloudMapNamespace.namespaceName}:${Web.port}`,
+    // })
 
-    new Web(this, webStackId, {
-      cloudMapNamespace: core.cloudMapNamespace,
-      dataDogApiKeySecret: core.dataDogApiKeySecret,
-      internalEndpointSecret: core.internalEndpointSecret,
-      env: stageContext.env,
-      secretsSecret: core.secretsSecret,
-      vpc: core.vpc,
-      hostedZone: core.hostedZone,
-      graphQlApiUrl: hasura.toServicePublicUrl(),
-      containerImageTag: this.node.tryGetContext('webContainerImageTag'),
-    })
+    // new Web(this, webStackId, {
+    //   cloudMapNamespace: core.cloudMapNamespace,
+    //   dataDogApiKeySecret: core.dataDogApiKeySecret,
+    //   internalEndpointSecret: core.internalEndpointSecret,
+    //   env: stageContext.env,
+    //   secretsSecret: core.secretsSecret,
+    //   vpc: core.vpc,
+    //   hostedZone: core.hostedZone,
+    //   graphQlApiUrl: hasura.toServicePublicUrl(),
+    //   containerImageTag: this.node.tryGetContext('webContainerImageTag'),
+    // })
   }
 }
 
