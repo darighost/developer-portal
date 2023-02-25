@@ -8,10 +8,10 @@ import { MultiEnvRootStack } from 'common/multi-env-stack'
 
 export class Hasura extends MultiEnvRootStack {
   public static readonly port = 8080
-  public readonly cloudMapNamespace: cdk.aws_servicediscovery.IPrivateDnsNamespace
-  public readonly service: cdk.aws_ecs.FargateService
-  public readonly serviceUrl: string
-  public readonly domainName: string
+  // public readonly cloudMapNamespace: cdk.aws_servicediscovery.IPrivateDnsNamespace
+  // public readonly service: cdk.aws_ecs.FargateService
+  // public readonly serviceUrl: string
+  // public readonly domainName: string
 
   constructor(
     scope: Construct,
@@ -29,8 +29,6 @@ export class Hasura extends MultiEnvRootStack {
     } & cdk.StackProps
   ) {
     super(scope, id, props)
-    this.serviceUrl = 'temp'
-    this.domainName = 'temp2'
     // const stackParameters = parameters({
     //   environment: this.node.tryGetContext('env'),
     //   hostedZone: props.hostedZone,

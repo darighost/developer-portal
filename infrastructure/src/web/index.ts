@@ -9,8 +9,8 @@ import { MultiEnvRootStack } from 'common/multi-env-stack'
 
 export class Web extends MultiEnvRootStack {
   public static readonly port = 3000
-  public readonly fargateService: cdk.aws_ecs_patterns.ApplicationLoadBalancedFargateService
-  public readonly scalableTarget: cdk.aws_ecs.ScalableTaskCount
+  // public readonly fargateService: cdk.aws_ecs_patterns.ApplicationLoadBalancedFargateService
+  // public readonly scalableTarget: cdk.aws_ecs.ScalableTaskCount
 
   constructor(
     scope: Construct,
