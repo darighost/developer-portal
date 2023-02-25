@@ -89,23 +89,6 @@ export class Core extends MultiEnvRootStack {
       comment: `Hosted zone for ${this.stackName} stack`,
     })
 
-    if (this.node.tryGetContext('env').id === 'production') {
-      new cdk.aws_route53.NsRecord(this, 'staging-ns', {
-        zone: this.hostedZone,
-        recordName: parameters({
-          environment: { ...this.node.tryGetContext('env'), stage: 'staging' },
-        }).hostedZoneName,
-
-        // REVIEW Find a way to import these values frm staging account, intstead of hardcoding
-        values: [
-          'ns-2031.awsdns-61.co.uk',
-          'ns-920.awsdns-51.net',
-          'ns-65.awsdns-08.com',
-          'ns-1091.awsdns-08.org',
-        ],
-      })
-    }
-
     // ANCHOR Exports
     this.exportValue(this.vpc.vpcId)
     this.vpc
