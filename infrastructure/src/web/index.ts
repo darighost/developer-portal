@@ -160,8 +160,9 @@ export class Web extends MultiEnvRootStack {
                 Host: 'http-intake.logs.datadoghq.com',
                 dd_service: id,
                 dd_source: 'nodejs',
-                dd_tags: `app:${this.node.tryGetContext('app')}, env:${this.node.tryGetContext('env').id
-                  }`,
+                dd_tags: `app:${this.node.tryGetContext('app')}, env:${
+                  this.node.tryGetContext('env').id
+                }`,
                 TLS: 'on',
                 provider: 'ecs',
               },
@@ -206,7 +207,7 @@ export class Web extends MultiEnvRootStack {
       this,
       'CertificateTmp',
       {
-        domainName: 'legacy.developer.worldcoin.org',
+        domainName: 'developer.worldcoin.org',
         validation: cdk.aws_certificatemanager.CertificateValidation.fromDns(
           props.hostedZone
         ),
@@ -218,7 +219,7 @@ export class Web extends MultiEnvRootStack {
         this,
         'FargateServiceTmp',
         {
-          domainName: 'legacy.developer.worldcoin.org',
+          domainName: 'developer.worldcoin.org',
           domainZone: props.hostedZone,
           certificate: certificateTmp,
           circuitBreaker: { rollback: true },
@@ -304,8 +305,9 @@ export class Web extends MultiEnvRootStack {
                 Host: 'http-intake.logs.datadoghq.com',
                 dd_service: id,
                 dd_source: 'nodejs',
-                dd_tags: `app:${this.node.tryGetContext('app')}, env:${this.node.tryGetContext('env').id
-                  }`,
+                dd_tags: `app:${this.node.tryGetContext('app')}, env:${
+                  this.node.tryGetContext('env').id
+                }`,
                 TLS: 'on',
                 provider: 'ecs',
               },
@@ -324,8 +326,13 @@ export class Web extends MultiEnvRootStack {
         }
       )
 
-    fargateServiceTmp.targetGroup.setAttribute('deregistration_delay.timeout_seconds', '10')
-    fargateServiceTmp.service.connections.allowFromAnyIpv4(cdk.aws_ec2.Port.tcp(Web.port))
+    fargateServiceTmp.targetGroup.setAttribute(
+      'deregistration_delay.timeout_seconds',
+      '10'
+    )
+    fargateServiceTmp.service.connections.allowFromAnyIpv4(
+      cdk.aws_ec2.Port.tcp(Web.port)
+    )
 
     // ANCHOR Health check
     fargateServiceTmp.targetGroup.configureHealthCheck({
@@ -338,7 +345,6 @@ export class Web extends MultiEnvRootStack {
     })
 
     fargateServiceTmp.loadBalancer.logAccessLogs(logsBucket)
-
 
     NagSuppressions.addResourceSuppressions(
       fargateServiceTmp.loadBalancer,
