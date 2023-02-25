@@ -191,57 +191,6 @@ export class Hasura extends MultiEnvRootStack {
       timeout: cdk.Duration.seconds(scalingConfig?.healthCheck.timeout ?? 2),
     })
 
-    // TODO Remove this after the migration
-    // FIXME To complete the migration change the domain name of the Fargate class above to api.legacy.developer.worldcoin.org
-    // #region Temporary deploy to api.legacy.developer.worldcoin.org
-    const fargateServicePatternTmp =
-      new cdk.aws_ecs_patterns.ApplicationLoadBalancedFargateService(
-        this,
-        'FargateServiceTmp',
-        {
-          domainName: 'api.developer.worldcoin.org',
-          domainZone: props.hostedZone,
-          protocol: cdk.aws_elasticloadbalancingv2.ApplicationProtocol.HTTPS,
-          redirectHTTP: true,
-          circuitBreaker: { rollback: true },
-          cluster: ecsCluster,
-          openListener: true,
-          desiredCount: 3,
-          taskDefinition,
-          taskSubnets: { subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_NAT },
-        }
-      )
-
-    fargateServicePatternTmp.targetGroup.setAttribute(
-      'deregistration_delay.timeout_seconds',
-      '10'
-    )
-
-    fargateServicePatternTmp.service.connections.allowTo(
-      props.databaseCluster,
-      cdk.aws_ec2.Port.tcp(props.databaseCluster.clusterEndpoint.port),
-      'Allow from Hasura to Database'
-    )
-
-    // ANCHOR Health check
-    fargateServicePatternTmp.targetGroup.configureHealthCheck({
-      enabled: true,
-      healthyThresholdCount:
-        scalingConfig?.healthCheck.healthyThresholdCount ?? 2,
-      interval: cdk.Duration.seconds(scalingConfig?.healthCheck.interval ?? 5),
-      path: scalingConfig?.healthCheck.path ?? '/healthz',
-      timeout: cdk.Duration.seconds(scalingConfig?.healthCheck.timeout ?? 2),
-    })
-
-    fargateServicePatternTmp.loadBalancer.logAccessLogs(logsBucket)
-
-    NagSuppressions.addResourceSuppressions(
-      fargateServicePatternTmp,
-      [{ id: 'AwsSolutions-EC23', reason: 'Public ELB.' }],
-      true
-    )
-    // #endregion
-
     // ANCHOR Autoscaling
     const scalableTarget = fargateServicePattern.service.autoScaleTaskCount({
       minCapacity:

@@ -98,10 +98,10 @@ export class Core extends MultiEnvRootStack {
 
         // REVIEW Find a way to import these values frm staging account, intstead of hardcoding
         values: [
-          'ns-583.awsdns-08.net',
-          'ns-1979.awsdns-55.co.uk',
-          'ns-291.awsdns-36.com',
-          'ns-1150.awsdns-15.org',
+          'ns-2031.awsdns-61.co.uk',
+          'ns-920.awsdns-51.net',
+          'ns-65.awsdns-08.com',
+          'ns-1091.awsdns-08.org',
         ],
       })
     }
