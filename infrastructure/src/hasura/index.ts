@@ -26,26 +26,20 @@ export class Hasura extends MultiEnvRootStack {
       readonly secretsSecret: cdk.aws_secretsmanager.ISecret
       readonly vpc: cdk.aws_ec2.IVpc
       readonly webUrl: string
-    } & cdk.StackProps
+    } & cdk.StackProps,
   ) {
     super(scope, id, props)
-    const stackParameters = parameters({
-      environment: this.node.tryGetContext('env'),
-      hostedZone: props.hostedZone,
-    })
-    const ecsCluster = new cdk.aws_ecs.Cluster(this, 'Cluster', {
-      containerInsights: true,
-      vpc: props.vpc,
-    })
+    const stackParameters = parameters({ environment: this.node.tryGetContext('env'), hostedZone: props.hostedZone })
+    const ecsCluster = new cdk.aws_ecs.Cluster(this, 'Cluster', { containerInsights: true, vpc: props.vpc })
     this.cloudMapNamespace = props.cloudMapNamespace
     this.domainName = stackParameters.domainName
 
     const scalingConfig = stackParameters.envs.SCALING_CONFIG
       ? (JSON.parse(stackParameters.envs.SCALING_CONFIG) as ScalingConfig)
-      : null
+      : null;
 
     if (!scalingConfig) {
-      console.error('Scaling config is not defined')
+      console.error("Scaling config is not defined")
     }
 
     const logsBucket = new cdk.aws_s3.Bucket(this, 'LogsBucket', {
@@ -55,35 +49,25 @@ export class Hasura extends MultiEnvRootStack {
     })
 
     // ANCHOR Secrets
-    const adminSecret = new cdk.aws_secretsmanager.Secret(
-      this,
-      'admin-secret',
-      {
-        generateSecretString: {
-          excludePunctuation: true,
-          passwordLength: 16,
-          generateStringKey: 'password',
-          secretStringTemplate: JSON.stringify({ username: 'admin' }),
-        },
-      }
-    )
+    const adminSecret = new cdk.aws_secretsmanager.Secret(this, 'admin-secret', {
+      generateSecretString: {
+        excludePunctuation: true,
+        passwordLength: 16,
+        generateStringKey: 'password',
+        secretStringTemplate: JSON.stringify({ username: 'admin' }),
+      },
+    })
 
     // ANCHOR Task definition
     // Define the task as FargateTaskDefinition, because taskImageOptions does not have the command param
-    const taskDefinition = new cdk.aws_ecs.FargateTaskDefinition(
-      this,
-      'task-definition',
-      {
-        cpu: scalingConfig?.taskDefinition.cpu || 512,
-        memoryLimitMiB: scalingConfig?.taskDefinition.memoryLimitMiB || 1024,
-      }
-    )
+    const taskDefinition = new cdk.aws_ecs.FargateTaskDefinition(this, 'task-definition', {
+      cpu: scalingConfig?.taskDefinition.cpu || 512,
+      memoryLimitMiB: scalingConfig?.taskDefinition.memoryLimitMiB || 1024,
+    })
 
     taskDefinition.addContainer('Hasura', {
       containerName: id,
-      image: cdk.aws_ecs.ContainerImage.fromRegistry(
-        'hasura/graphql-engine:v2.18.0'
-      ),
+      image: cdk.aws_ecs.ContainerImage.fromRegistry('hasura/graphql-engine:v2.18.0'),
       command: [
         '/bin/sh',
         '-c',
@@ -94,37 +78,14 @@ export class Hasura extends MultiEnvRootStack {
         NEXT_API_URL: `${props.webUrl}/api`,
       },
       secrets: {
-        HASURA_GRAPHQL_ADMIN_SECRET: cdk.aws_ecs.Secret.fromSecretsManager(
-          adminSecret,
-          'password'
-        ),
-        HASURA_GRAPHQL_JWT_SECRET: cdk.aws_ecs.Secret.fromSecretsManager(
-          props.secretsSecret,
-          'HASURA_GRAPHQL_JWT_SECRET'
-        ),
-        POSTGRES_USER: cdk.aws_ecs.Secret.fromSecretsManager(
-          props.databaseClusterSecret,
-          'username'
-        ),
-        POSTGRES_PASSWORD: cdk.aws_ecs.Secret.fromSecretsManager(
-          props.databaseClusterSecret,
-          'password'
-        ),
-        POSTGRES_HOST: cdk.aws_ecs.Secret.fromSecretsManager(
-          props.databaseClusterSecret,
-          'host'
-        ),
-        POSTGRES_PORT: cdk.aws_ecs.Secret.fromSecretsManager(
-          props.databaseClusterSecret,
-          'port'
-        ),
-        POSTGRES_DATABASE: cdk.aws_ecs.Secret.fromSecretsManager(
-          props.databaseClusterSecret,
-          'dbname'
-        ),
-        INTERNAL_ENDPOINTS_SECRET: cdk.aws_ecs.Secret.fromSecretsManager(
-          props.internalEndpointSecret
-        ),
+        HASURA_GRAPHQL_ADMIN_SECRET: cdk.aws_ecs.Secret.fromSecretsManager(adminSecret, 'password'),
+        HASURA_GRAPHQL_JWT_SECRET: cdk.aws_ecs.Secret.fromSecretsManager(props.secretsSecret, 'HASURA_GRAPHQL_JWT_SECRET'),
+        POSTGRES_USER: cdk.aws_ecs.Secret.fromSecretsManager(props.databaseClusterSecret, 'username'),
+        POSTGRES_PASSWORD: cdk.aws_ecs.Secret.fromSecretsManager(props.databaseClusterSecret, 'password'),
+        POSTGRES_HOST: cdk.aws_ecs.Secret.fromSecretsManager(props.databaseClusterSecret, 'host'),
+        POSTGRES_PORT: cdk.aws_ecs.Secret.fromSecretsManager(props.databaseClusterSecret, 'port'),
+        POSTGRES_DATABASE: cdk.aws_ecs.Secret.fromSecretsManager(props.databaseClusterSecret, 'dbname'),
+        INTERNAL_ENDPOINTS_SECRET: cdk.aws_ecs.Secret.fromSecretsManager(props.internalEndpointSecret),
       },
       logging: cdk.aws_ecs.LogDrivers.firelens({
         options: {
@@ -132,60 +93,46 @@ export class Hasura extends MultiEnvRootStack {
           Host: 'http-intake.logs.datadoghq.com',
           dd_service: id,
           dd_source: 'nodejs',
-          dd_tags: `app:${this.node.tryGetContext('app')}, env:${
-            this.node.tryGetContext('env').id
-          }`,
+          dd_tags: `app:${this.node.tryGetContext('app')}, env:${this.node.tryGetContext('env').id}`,
           TLS: 'on',
           provider: 'ecs',
         },
-        secretOptions: {
-          apikey: cdk.aws_ecs.Secret.fromSecretsManager(
-            props.dataDogApiKeySecret
-          ),
-        },
+        secretOptions: { apikey: cdk.aws_ecs.Secret.fromSecretsManager(props.dataDogApiKeySecret) },
       }),
       portMappings: [{ containerPort: Hasura.port }],
     })
 
     // ANCHOR Set up Fargate service
-    const fargateServicePattern =
-      new cdk.aws_ecs_patterns.ApplicationLoadBalancedFargateService(
-        this,
-        'FargateService',
-        {
-          cloudMapOptions: {
-            name: id,
-            cloudMapNamespace: props.cloudMapNamespace,
-          },
-          domainName: stackParameters.domainName,
-          domainZone: props.hostedZone,
-          protocol: cdk.aws_elasticloadbalancingv2.ApplicationProtocol.HTTPS,
-          redirectHTTP: true,
-          circuitBreaker: { rollback: true },
-          cluster: ecsCluster,
-          openListener: true,
-          desiredCount: 3,
-          taskDefinition,
-          taskSubnets: { subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_NAT },
-        }
-      )
-
-    fargateServicePattern.targetGroup.setAttribute(
-      'deregistration_delay.timeout_seconds',
-      '10'
+    const fargateServicePattern = new cdk.aws_ecs_patterns.ApplicationLoadBalancedFargateService(
+      this,
+      'FargateService',
+      {
+        cloudMapOptions: { name: id, cloudMapNamespace: props.cloudMapNamespace },
+        domainName: stackParameters.domainName,
+        domainZone: props.hostedZone,
+        protocol: cdk.aws_elasticloadbalancingv2.ApplicationProtocol.HTTPS,
+        redirectHTTP: true,
+        circuitBreaker: { rollback: true },
+        cluster: ecsCluster,
+        openListener: true,
+        desiredCount: 3,
+        taskDefinition,
+        taskSubnets: { subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_NAT },
+      },
     )
+
+    fargateServicePattern.targetGroup.setAttribute('deregistration_delay.timeout_seconds', '10')
 
     fargateServicePattern.service.connections.allowTo(
       props.databaseCluster,
       cdk.aws_ec2.Port.tcp(props.databaseCluster.clusterEndpoint.port),
-      'Allow from Hasura to Database'
+      'Allow from Hasura to Database',
     )
 
     // ANCHOR Health check
     fargateServicePattern.targetGroup.configureHealthCheck({
       enabled: true,
-      healthyThresholdCount:
-        scalingConfig?.healthCheck.healthyThresholdCount ?? 2,
+      healthyThresholdCount: scalingConfig?.healthCheck.healthyThresholdCount ?? 2,
       interval: cdk.Duration.seconds(scalingConfig?.healthCheck.interval ?? 5),
       path: scalingConfig?.healthCheck.path ?? '/healthz',
       timeout: cdk.Duration.seconds(scalingConfig?.healthCheck.timeout ?? 2),
@@ -194,40 +141,35 @@ export class Hasura extends MultiEnvRootStack {
     // TODO Remove this after the migration
     // FIXME To complete the migration change the domain name of the Fargate class above to api.legacy.developer.worldcoin.org
     // #region Temporary deploy to api.legacy.developer.worldcoin.org
-    const fargateServicePatternTmp =
-      new cdk.aws_ecs_patterns.ApplicationLoadBalancedFargateService(
-        this,
-        'FargateServiceTmp',
-        {
-          domainName: 'api.developer.worldcoin.org',
-          domainZone: props.hostedZone,
-          protocol: cdk.aws_elasticloadbalancingv2.ApplicationProtocol.HTTPS,
-          redirectHTTP: true,
-          circuitBreaker: { rollback: true },
-          cluster: ecsCluster,
-          openListener: true,
-          desiredCount: 3,
-          taskDefinition,
-          taskSubnets: { subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_NAT },
-        }
-      )
-
-    fargateServicePatternTmp.targetGroup.setAttribute(
-      'deregistration_delay.timeout_seconds',
-      '10'
+    const fargateServicePatternTmp = new cdk.aws_ecs_patterns.ApplicationLoadBalancedFargateService(
+      this,
+      'FargateServiceTmp',
+      {
+        domainName: 'api.legacy.developer.worldcoin.org',
+        domainZone: props.hostedZone,
+        protocol: cdk.aws_elasticloadbalancingv2.ApplicationProtocol.HTTPS,
+        redirectHTTP: true,
+        circuitBreaker: { rollback: true },
+        cluster: ecsCluster,
+        openListener: true,
+        desiredCount: 3,
+        taskDefinition,
+        taskSubnets: { subnetType: cdk.aws_ec2.SubnetType.PRIVATE_WITH_NAT },
+      },
     )
+
+    fargateServicePatternTmp.targetGroup.setAttribute('deregistration_delay.timeout_seconds', '10')
 
     fargateServicePatternTmp.service.connections.allowTo(
       props.databaseCluster,
       cdk.aws_ec2.Port.tcp(props.databaseCluster.clusterEndpoint.port),
-      'Allow from Hasura to Database'
+      'Allow from Hasura to Database',
     )
 
     // ANCHOR Health check
     fargateServicePatternTmp.targetGroup.configureHealthCheck({
       enabled: true,
-      healthyThresholdCount:
-        scalingConfig?.healthCheck.healthyThresholdCount ?? 2,
+      healthyThresholdCount: scalingConfig?.healthCheck.healthyThresholdCount ?? 2,
       interval: cdk.Duration.seconds(scalingConfig?.healthCheck.interval ?? 5),
       path: scalingConfig?.healthCheck.path ?? '/healthz',
       timeout: cdk.Duration.seconds(scalingConfig?.healthCheck.timeout ?? 2),
@@ -238,29 +180,25 @@ export class Hasura extends MultiEnvRootStack {
     NagSuppressions.addResourceSuppressions(
       fargateServicePatternTmp,
       [{ id: 'AwsSolutions-EC23', reason: 'Public ELB.' }],
-      true
+      true,
     )
     // #endregion
 
     // ANCHOR Autoscaling
     const scalableTarget = fargateServicePattern.service.autoScaleTaskCount({
-      minCapacity:
-        scalingConfig?.autoscaling.autoScaleTaskCount.minCapacity ?? 1,
-      maxCapacity:
-        scalingConfig?.autoscaling.autoScaleTaskCount.maxCapacity ?? 30,
+      minCapacity: scalingConfig?.autoscaling.autoScaleTaskCount.minCapacity ?? 1,
+      maxCapacity: scalingConfig?.autoscaling.autoScaleTaskCount.maxCapacity ?? 30
     })
 
-    scalableTarget.scaleOnCpuUtilization('CpuScaling', {
-      targetUtilizationPercent:
-        scalingConfig?.autoscaling.scaleOnCpuUtilization
-          .targetUtilizationPercent ?? 40,
-    })
+    scalableTarget.scaleOnCpuUtilization(
+      'CpuScaling',
+      { targetUtilizationPercent: scalingConfig?.autoscaling.scaleOnCpuUtilization.targetUtilizationPercent ?? 40 }
+    )
 
-    scalableTarget.scaleOnMemoryUtilization('MemoryScaling', {
-      targetUtilizationPercent:
-        scalingConfig?.autoscaling.scaleOnMemoryUtilization
-          .targetUtilizationPercent ?? 50,
-    })
+    scalableTarget.scaleOnMemoryUtilization(
+      'MemoryScaling',
+      { targetUtilizationPercent: scalingConfig?.autoscaling.scaleOnMemoryUtilization.targetUtilizationPercent ?? 50 }
+    )
 
     // ANCHOR Set up logging
     new DataDog(this, 'DataDog', {
@@ -270,34 +208,23 @@ export class Hasura extends MultiEnvRootStack {
 
     fargateServicePattern.loadBalancer.logAccessLogs(logsBucket)
 
-    const serviceUrlOutput = fargateServicePattern.node.findChild(
-      'ServiceURL'
-    ) as cdk.CfnOutput
+    const serviceUrlOutput = fargateServicePattern.node.findChild('ServiceURL') as cdk.CfnOutput
     this.service = fargateServicePattern.service
     this.serviceUrl = `${serviceUrlOutput.value}/v1/graphql`
 
     NagSuppressions.addResourceSuppressions(logsBucket, [
-      {
-        id: 'AwsSolutions-S1',
-        reason: 'Breaking logs bucket needs to store access logs recursion.',
-      },
+      { id: 'AwsSolutions-S1', reason: 'Breaking logs bucket needs to store access logs recursion.' },
     ])
 
     NagSuppressions.addResourceSuppressions(
       fargateServicePattern,
       [{ id: 'AwsSolutions-EC23', reason: 'Public ELB.' }],
-      true
+      true,
     )
 
-    NagSuppressions.addResourceSuppressions(
-      fargateServicePattern.taskDefinition,
-      [
-        {
-          id: 'AwsSolutions-ECS2',
-          reason: 'Avoiding env variables is to much hassle.',
-        },
-      ]
-    )
+    NagSuppressions.addResourceSuppressions(fargateServicePattern.taskDefinition, [
+      { id: 'AwsSolutions-ECS2', reason: 'Avoiding env variables is to much hassle.' },
+    ])
 
     NagSuppressions.addResourceSuppressions(adminSecret, [
       { id: 'AwsSolutions-SMG4', reason: 'Requires a dedicated planning.' },
