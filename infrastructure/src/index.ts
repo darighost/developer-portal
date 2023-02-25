@@ -4,8 +4,8 @@ import assert from 'assert'
 import { AwsSolutionsChecks } from 'cdk-nag'
 import { Core } from './core'
 import { Data } from './data'
-import { Hasura } from './hasura'
-import { Web } from './web'
+// import { Hasura } from './hasura'
+// import { Web } from './web'
 
 export class App extends cdk.App {
   constructor(props?: cdk.AppProps) {
@@ -30,9 +30,9 @@ export class App extends cdk.App {
     Object.entries(stageContext).forEach(([key, value]) => this.node.setContext(key, value))
 
     // ANCHOR Define the stacks
-    const webStackId = 'web'
+   // const webStackId = 'web'
     const core = new Core(this, 'core', { env: stageContext.env, terminationProtection: true })
-    const data = new Data(this, 'data', { env: stageContext.env, vpc: core.vpc, terminationProtection: true })
+    new Data(this, 'data', { env: stageContext.env, vpc: core.vpc, terminationProtection: true })
 
     // const hasura = new Hasura(this, 'hasura', {
     //   cloudMapNamespace: core.cloudMapNamespace,
