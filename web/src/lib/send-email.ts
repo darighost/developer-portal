@@ -29,6 +29,8 @@ export const sendEmail = async (params: {
     throw new Error("templateId and templateData must be passed together");
   }
 
+  console.log(params);
+
   sendgrid.setApiKey(params.apiKey);
 
   try {
