@@ -70,14 +70,12 @@ export default async function handleInvite(
       id: userId,
     });
 
-    console.log({ fetchUserRes });
-
     if (!fetchUserRes.user[0]) {
-      // return errorHasuraQuery({
-      //   res,
-      //   detail: "User not found",
-      //   code: "user_not_found",
-      // });
+      return errorHasuraQuery({
+        res,
+        detail: "User not found",
+        code: "user_not_found",
+      });
     }
 
     const createInvitesRes = await getCreateInvitesSdk(client).CreateInvites({
@@ -86,8 +84,6 @@ export default async function handleInvite(
         team_id: teamId,
       })),
     });
-
-    console.log({ createInvitesRes });
 
     if (
       !createInvitesRes.invites?.returning ||
@@ -99,8 +95,6 @@ export default async function handleInvite(
         code: "invalid_emails",
       });
     }
-
-    console.log("test");
 
     const promises = [];
     for (const invite of createInvitesRes.invites?.returning) {
@@ -117,12 +111,7 @@ export default async function handleInvite(
             <Invite
               email={invite.email}
               link={link}
-              user={{
-                id: "test",
-                email: "test",
-                name: "test",
-                team: { name: "test", id: "test" },
-              }}
+              user={fetchUserRes.user[0]}
             />
           ),
         })
