@@ -2,6 +2,8 @@
  * Constants available to both backend and frontend.
  */
 
+// foobar
+
 // ANCHOR: Orb credential
 export const ORB_SEQUENCER = "https://signup-orb-ethereum.crypto.worldcoin.org";
 export const ORB_SEQUENCER_STAGING =
